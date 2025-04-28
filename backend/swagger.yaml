@@ -1,0 +1,432 @@
+openapi: 3.0.1
+info:
+  title: SEforALL API
+  description: "
+  SEforALL API documentation. This documentation describes how to operate with below listed endpoints.
+  "
+  version: v1.0
+
+paths:
+  /seforall/modelPredict:
+    post:
+      tags:
+        - Generic
+      summary: POST /seforall/modelPredict
+      description: "
+                    Call ML models to predict building class using image \n
+                    - confideence between 0 - 0.5 -> 'non-res' \n
+                    - confideence between 0.5 - 1 -> 'res'
+                    "
+      requestBody:
+        description: Predict batch of images
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                country:
+                  type: string
+                  example: Kenya
+                samples:
+                  type: array
+                  xml:
+                    wrapped: true
+                  items:
+                    example: [image array 124x124, area_in_meters, smod_id]
+      responses:
+        '201':
+          description: Successfully processed all inputs, predictions are returned in the same order as input received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictions:
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      type: number
+                      format: float
+                      minimum: 0
+                      maximum: 1
+                      example: 0.57
+
+        '500':
+          description: Error occured
+          content: {}
+  /seforall/processPolygon:
+    post:
+      tags:
+        - Generic
+      summary: POST /seforall/processPolygon
+      operationId: processPolygon
+      description: "API call will prepare [GeoJSON](https://geojson.org/) response from desired polygon coordinates and country or state where the polygon is located. GeoJSON will contain each building centroid of which is inside polygon boundaries. Building necessary information will be included to the properties of GeoJSON properties"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                country:
+                  type: string
+                  example: Kenya
+                polygon:
+                  type: array
+                  description: Polygon boundary coordinates
+                  xml:
+                    wrapped: true
+                  items:
+                    example:
+                      - [36.81811868745058, -1.2826108923797932]
+                      - [36.81826227024743, -1.2829184926934971]
+                      - [36.819277605733845, -1.2823972810303417]
+                      - [36.8191357322568, -1.282091389545073]
+                      - [36.81811868745058, -1.2826108923797932]
+      responses:
+        '201':
+          description: Success, polygon processed GeoJSON response created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  GeoJSON:
+                    $ref: '#/components/schemas/GeoJSON'
+
+        '500':
+          description: Error occured
+          content: {}
+  /seforall/processArea:
+    post:
+      tags:
+        - Generic
+      summary: POST /seforall/processArea
+      operationId: processArea
+      description: "API call will prepare [GeoJSON](https://geojson.org/) response from existing area. GeoJSON will contain each building which is inside area. Building necessary information will be included to the properties of GeoJSON properties"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                area:
+                  type: string
+                  xml:
+                    wrapped: true
+                  default: "country_state_area_subarea"
+
+      responses:
+        '201':
+          description: Success, area processed GeoJSON response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  GeoJSON:
+                    $ref: '#/components/schemas/AreaGeoJSON'
+
+        '500':
+          description: Error occured
+          content: {}
+  /seforall/getAllAreaNames:
+    get:
+      tags:
+        - Generic
+      summary: GET /seforall/getAllAreaNames
+      operationId: getAllAreaNames
+      description: "API call will prepare JSON response which will include all area existing names."
+      responses:
+        '201':
+          description: Success, all areas names JSON response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllAreaJSON'
+        '500':
+          description: Error occured
+          content: { }
+  /seforall/notifications:
+    get:
+      tags:
+        - Generic
+      summary: GET /seforall/notifications
+      operationId: notifications
+      description: "API call will prepare JSON response which will include the last notification on db."
+      responses:
+        '200':
+          description: Success, get last notification response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationJSON'
+        '204':
+          description: Success, but none notification from the last 2 days were found in db.
+          content: { }
+        '500':
+          description: Error occured
+          content: { }
+components:
+  schemas:
+    GeoJSON:
+      type: object
+      xml:
+        wrapped: true
+      properties:
+        type:
+          type: string
+          example: FeatureCollection
+        features:
+          type: array
+          items:
+            example:
+              geometry:
+                type: "Polygon"
+                coordinates:
+                  - "[lon1 float, lat1 float]"
+                  - "[lon2 float, lat2 float]"
+                  - "..."
+                  - "[lon1 float, lat1 float]"
+              id: 1
+              properties:
+                properties:
+                  type_source: Can be osm, area or classification_model
+                  res_type: ["Can be 'res' of 'non-res' "]
+                  height: 6
+                  area_in_meters: 123.456
+                  latitude: 12.345
+                  longitude: 12.345
+                  source: OSM
+                  urban_split: "Urban"
+                  ghsl_smod: "Urban Centre (City)"
+                  floors: 6
+                  gfa_in_meters: 1384.1508
+                  building_faces: 4
+                  perimeter_in_meters: 60.76871025983301
+                  osm_type: ""
+                  elec_access_percent: 99.29711
+                  elec_consumption_kwh_month: 1864.75745
+                  elec_consumption_std_kwh_month": 12754137
+                  confidence: 12.34
+              type: Feature
+    AreaGeoJSON:
+      type: object
+      properties:
+        type:
+          type: string
+          example: FeatureCollection
+        county_properties:
+          type: object
+          properties:
+            count_of_buildings:
+              type: integer
+              example: 276
+            count_of_buildings_res:
+              type: integer
+              example: 270
+            count_of_buildings_nonRes:
+              type: integer
+              example: 6
+            square_area_of_county:
+              type: number
+              format: float
+              example: 2643610.7330043577
+            square_area_of_buildings:
+              type: number
+              format: float
+              example: 12845.6225
+            square_area_res:
+              type: number
+              format: float
+              example: 12533.8118
+            square_area_nonRes:
+              type: number
+              format: float
+              example: 311.81070000000005
+            model_confidence_res:
+              type: number
+              format: float
+              example: 0.7680004694835681
+            model_confidence_nonRes:
+              type: number
+              format: float
+              example: 0.5443333333333333
+            height_avg:
+              type: number
+              format: float
+              example: 3.0869565217391304
+            height_avg_res:
+              type: number
+              format: float
+              example: 3.088888888888889
+            height_avg_nonRes:
+              type: number
+              format: float
+              example: 3
+            county_polygon_coordinates:
+              type: array
+              items:
+                type: array
+                items:
+                  type: number
+                  format: float
+              example: [
+                [ 74.97803832753728, 20.164466386635496 ],
+                [ 74.97590477124531, 20.16407459223873 ],
+                [ 74.97300590782348, 20.16367416104174 ],
+                [ 74.96998782179375, 20.163621667309616 ],
+                [ 74.96835686571674, 20.163676641910055 ],
+                [ 74.96599862909409, 20.163564931963588 ],
+                [ 74.96122937263941, 20.162654987998426 ],
+                [ 74.96219422433998, 20.16026063778382 ],
+                [ 74.96406253777295, 20.156894850519254 ],
+                [ 74.96502765717148, 20.15512386795777 ],
+                [ 74.96450888817974, 20.15116751080463 ],
+                [ 74.96442192407372, 20.14970860026088 ],
+                [ 74.96641577257606, 20.14879523420568 ],
+                [ 74.97009800734986, 20.147935234694817 ],
+                [ 74.97486586782261, 20.1473048142768 ],
+                [ 74.97844338149214, 20.147510542029295 ],
+                [ 74.97861165930105, 20.148901625664173 ],
+                [ 74.98012284839116, 20.14867041653631 ],
+                [ 74.98018643563853, 20.15083833981135 ],
+                [ 74.97752729573509, 20.15089861079854 ],
+                [ 74.97807645113964, 20.156887437949425 ],
+                [ 74.97803832753728, 20.164466386635496 ]
+              ]
+            rural:
+              type: integer
+              example: 276
+        features:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                example: Feature
+              properties:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                    example: 20.15106866
+                  longitude:
+                    type: number
+                    format: float
+                    example: 74.96758673
+                  height:
+                    type: number
+                    format: float
+                    example: 3
+                  area_in_meters:
+                    type: number
+                    format: float
+                    example: 13.0346
+                  classification_type:
+                    type: string
+                    example: res
+                  classification_source:
+                    type: string
+                    example: area
+                  footprint_source:
+                    type: string
+                    example: google
+                  urban_split:
+                    type: string
+                    example: Rural
+                  ghsl_smod:
+                    type: string
+                    example: Very Low Density Rural Grids (Mostly Uninhabited Area)
+              geometry:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    example: Polygon
+                  coordinates:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: number
+                        format: float
+                    example: [
+                      [
+                        [ 74.96759906, 20.15104812 ],
+                        [ 74.96760377, 20.15108595 ],
+                        [ 74.9675744, 20.15108921 ],
+                        [ 74.9675697, 20.15105138 ],
+                        [ 74.96759906, 20.15104812 ]
+                      ]
+                    ]
+    AllAreaJSON:
+      type: "object"
+      properties:
+        Kenya:
+          type: "object"
+          properties:
+            Baringo:
+              type: "object"
+              format: string
+              example: Kenya_Baringo.json
+            Muranga:
+              type: "object"
+              format: string
+              example: Kenya_Muranga.json
+            ...:
+              type: "object"
+              format: string
+              example: ....json
+            West_Pokot:
+              type: "object"
+              format: string
+              example: West_Pokot.json
+        Maharashtra:
+          type: "object"
+          properties:
+            Nagpur:
+              type: "object"
+              format: string
+              properties:
+                Narkhed:
+                  type: "object"
+                  format: string
+                  example: Maharashtra_Nagpur_Narkhed.json
+                ...:
+                  type: "object"
+                  format: string
+                  example: ....json
+                Bhiwapur:
+                  type: "object"
+                  format: string
+                  example: Maharashtra_Nagpur_Bhiwapur.json
+            ...:
+              type: "object"
+              format: string
+              example: ....json
+            Mumbai:
+              type: "object"
+              format: string
+              example: Maharashtra_Mumbai.json
+    NotificationJSON:
+      type: "object"
+      properties:
+        title:
+          type: "string"
+          example: "NEW COUNTRY DATA AVAILABLE!"
+        message:
+          type: "string"
+          example: "New energy data for Country test is now live! Check out the latest updates to stay informed and support better decision-making."
+        button_text:
+          type: "string"
+          example: "TAKE A LOOK"
+        button_link:
+          type: "string"
+          example: "map"
+        timestamp:
+          type: "integer"
+          format: "int64"
+          example: 1739992206301
